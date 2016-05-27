@@ -20,14 +20,24 @@
 
 # This file contains an example of using TranSMART RClient to fetch study data.
 
-# For transmartRClient installation see https://github.com/thehyve/RInterface
-
 #############################################################################
 #                             Introduction                                  #
 #############################################################################
+# Welcome to the Rclient demo for the Open Data workshop. For the workshop
+# we will use the Sorlie(2003) study to demonstrate how to retrieve the data
+# from a tranSMART instance and generate a heatmap basd on the actual paper.
+# 
+# This server with Rstudio, Rscripts and Rclient will stay available until
+# Friday 3rd of June. If you want to redo the analysis or have a closer look
+# at the code please feel free do download and use. Note: You will have to
+# install the tranSMART RClient on your own machine.
+# For transmartRClient installation see https://github.com/thehyve/RInterface
+#
+# For any questions please contact us at office@thehyve.nl or support@thehyve.nl
 
-
-
+#############################################################################
+#                               Workshop                                    #
+#############################################################################
 # Example steps to authenticate with, connect to, and retrieve data from tranSMART
 # load package
 require("transmartRClient")
@@ -39,6 +49,7 @@ connectToTransmart("http://transmart-demo.thehyve.net/transmart")
 # retrieve a list of the available studies in the database:
 studies <- getStudies()
 print(studies)
+View(studies)
 
 # to access the studies programmatically use for example: 
 # study<-studies$id[1]
@@ -63,17 +74,17 @@ allObservations$conceptInfo[1:10,]
 
 # retrieve information about the concepts that are present for this study
 concepts <- getConcepts(study)
-concepts
+View(concepts[c("name","type","fullName")])
 
 # You can use the concept names or the concept links to only retrieve data for a subset of the variables:
 
 # retrieve observations for the first concept which concept name contains "Tumor Subtypes"
 observations <- getObservations(study, concept.match = "Tumor Subtypes", as.data.frame = T)
-observations$observations
+View(observations$observations)
 
 # retrieve observations belonging to the first two concepts by using the api.links contained in the getConcepts-result
 observations <- getObservations(study, concept.links = concepts$api.link.self.href[c(1,2)])
-observations$observations[1:10,] 
+View(observations$observations[1:10,])
 
 
 # if a concept contains high dimensional data, use the following command to obtain this data. 
@@ -90,34 +101,29 @@ dataDownloaded <- getHighdimData(study.name = study, concept.match = "Breast", p
 summary(dataDownloaded)
 
 #View the data
-dataDownloaded$data[1:10,1:10]
+View(dataDownloaded$data[1:10,1:10])
 
 #select gene expression data
 expression_data<-dataDownloaded$data[,-c(1:6)]
 dim(expression_data)
 rownames(expression_data)<-dataDownloaded$data$patientId
-expression_data[1:10,1:5]
+View(expression_data[1:10,1:5])
 
 #Make a heatmap
-#If the dimensions of the expression_data table are large, you may want to create a subset of the data first. 
+# Please note that if the dimensions of the expression_data table are large,
+# it may take some time to generate the heatmap. You may want to create a subset
+# of the data first, which we will do now for the Sorlie(2003) example.
 
-# select only the cases and controls (excluding the patients for which the lung disease is not specified). Note: in the observation table the database IDs 
-# are used to identify the patients and not the patient IDs that are used in the gene expression dataset
-
-library(Cairo)
-library(ggplot2)
-library(reshape2)
-library(gplots)
-library(plyr)
-
-# Create a dataframe where it is clear which patients are part of what group, remove the patients that do not have a subgroup
+# Create a dataframe where it is clear which patients are part of what group,
+# remove the patients that do not have a subgroup ("None")
+# For this step you use the downloaded clinical data to filter the high dimensional data
 tmpData = merge(allObservations$subjectInfo[c("subject.id","subject.inTrialId")],allObservations$observations,by="subject.id")
 groups <- tmpData[c("subject.inTrialId","Subjects_Medical History_Tumor Characteristics_Tumor Subtypes")]
 colnames(groups)<- c("subjects","tumorSubtypes")
 groups <- groups[groups$"tumorSubtypes"!="None",]
-#View(groups) # you can use this to have a look in Rstudio, uncomment first
+View(groups)
 expression_data <- expression_data[row.names(expression_data)%in% groups$subjects,]
-#View(expression_data) # Correct subject IDs are included. Can view in Rstudio if you like.
+View(expression_data)
 
 ## The following genes are a selection from all the genes used in the paper. Per subgroup a few genes have been used.
 ERBB2 <- c("TLK2","MED24","MED1","ERBB2","GRB7") 
@@ -147,10 +153,14 @@ colcolor[grep("ERBB2",colnames(mRNAdata))]<-"deeppink3"
 colcolor[grep("Normal",colnames(mRNAdata))]<-"chartreuse4"
 
 ## generate heatmap ##
-heatmap.2(mRNAdata,
-          Rowv = TRUE,
-          Colv = TRUE,
-          trace="none",
-          col = greenred(800),
-          ColSideColors = colcolor
-)
+library(gplots)
+heatmap.2(mRNAdata, Rowv = TRUE, Colv = TRUE, trace="none",
+          col = greenred(800), ColSideColors = colcolor)
+
+###############################################################################
+# If you want to play more with the tranSMART Rclient possible options are:
+# - Generate a larger heatmap
+# - Try to remake the Kaplan Meier plot from the article
+# - Play around with one of the many other interesting studies in the tranSMART instance
+# For any questions please contact us at office@thehyve.nl or support@thehyve.nl
+###############################################################################
